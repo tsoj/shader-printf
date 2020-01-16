@@ -179,26 +179,44 @@ inline std::string addPrintToSource(std::string source) {
 	// get rid of comments beforehand
 	std::string commentedSource = "";
 	std::swap(source, commentedSource);
-
-	bool commentLong = false;
-	bool commentRow = false;
-	bool inString = false;
-	for (size_t i = 0; i < commentedSource.length(); ++i) {
-		if (commentedSource[i] == '"' && (i == 0 || commentedSource[i - 1] != '\\')) inString = !inString;
-		if (!inString) {
-			if (i < commentedSource.length() - 1 && commentedSource[i] == '/' && commentedSource[i + 1] == '*') { commentLong = true; i++; continue; }
-			if (i < commentedSource.length() - 1 && commentedSource[i] == '*' && commentedSource[i + 1] == '/') { commentLong = false; i++; continue; }
-			if (i < commentedSource.length() - 1 && commentedSource[i] == '/' && commentedSource[i + 1] == '/') { commentRow = true; i++; continue; }
-			if (commentedSource[i] == '\n') commentRow = false;
-		}
-		if (!commentLong && !commentRow)
-			source += std::string(1, commentedSource[i]);
-	}
+    {
+        bool commentLong = false;
+        bool commentRow = false;
+        bool inString = false;
+        for (size_t i = 0; i < commentedSource.length(); ++i)
+        {
+            if (commentedSource[i] == '"' && (i == 0 || commentedSource[i - 1] != '\\')) inString = !inString;
+            if (!inString)
+            {
+                if (i < commentedSource.length() - 1 && commentedSource[i] == '/' && commentedSource[i + 1] == '*')
+                {
+                    commentLong = true;
+                    i++;
+                    continue;
+                }
+                if (i < commentedSource.length() - 1 && commentedSource[i] == '*' && commentedSource[i + 1] == '/')
+                {
+                    commentLong = false;
+                    i++;
+                    continue;
+                }
+                if (i < commentedSource.length() - 1 && commentedSource[i] == '/' && commentedSource[i + 1] == '/')
+                {
+                    commentRow = true;
+                    i++;
+                    continue;
+                }
+                if (commentedSource[i] == '\n') commentRow = false;
+            }
+            if (!commentLong && !commentRow)
+                source += std::string(1, commentedSource[i]);
+        }
+    }
 
 	// insert our buffer definition after the glsl version define
 	size_t version = source.find("#version");
 	size_t extension = source.rfind("#extension"); // extensions also need to be defined before actual code
-	if (extension != std::string::npos)	version = max(extension, version);
+	if (extension != std::string::npos)	version = std::max(extension, version);
 	size_t lineAfterVersion = 2, bufferInsertOffset = 0;
 
 	if (version != std::string::npos) {
@@ -209,10 +227,11 @@ inline std::string addPrintToSource(std::string source) {
 
 		bufferInsertOffset = version;
 		for (size_t i = version; i < source.length(); ++i)
-			if (source[i] == '\n')
-				break;
-			else
-				bufferInsertOffset += 1;
+        {
+            bufferInsertOffset += 1;
+            if (source[i] == '\n')
+                break;
+        }
 	}
 
 	// go through all printfs in the shader
@@ -294,36 +313,52 @@ inline std::string addPrintToSource(std::string source) {
 				writeSize++;
 			}
 			if (inString && source[i] == '%')
-				if (source[i + 1] == '%') {
-					i++;
-					replacement += "printfData[printfIndex++]=" + std::to_string(unsigned(source[i])) + ";";
-					writeSize++;
-				}
-				else {
-					int vecSize = 1;
-					while (std::string(1, source[i]).find_first_of("eEfFgGdiuoxXaA") == std::string::npos) {
-						// a special feature to support vector prints
-						if (source[i] == '^')
-							vecSize = source[i + 1] - '0';
-						i++;
-						replacement += "printfData[printfIndex++]=" + std::to_string(unsigned(source[i])) + ";";
-						writeSize++;
-					}
-					// store the actual data in the element after the format string
-					for (int j = 0; j < vecSize; ++j) {
-						std::string arg = args[argumentIndex];
-						if (vecSize > 1)
-							arg = "(" + arg + ")." + std::string("xyzw")[j];
-						switch (source[i]) {
-						case 'e': case 'E': case 'f': case 'F': case 'g': case 'G': case 'x': case 'X':
-							replacement += "printfData[printfIndex++]=floatBitsToUint(" + arg + ");"; break;
-						default:
-							replacement += "printfData[printfIndex++]=" + arg + ";"; break;
-						}
-						writeSize++;
-					}
-					argumentIndex++;
-				}
+            {
+                if (source[i + 1] == '%')
+                {
+                    i++;
+                    replacement += "printfData[printfIndex++]=" + std::to_string(unsigned(source[i])) + ";";
+                    writeSize++;
+                }
+                else
+                {
+                    int vecSize = 1;
+                    while (std::string(1, source[i]).find_first_of("eEfFgGdiuoxXaA") == std::string::npos)
+                    {
+                        // a special feature to support vector prints
+                        if (source[i] == '^')
+                            vecSize = source[i + 1] - '0';
+                        i++;
+                        replacement += "printfData[printfIndex++]=" + std::to_string(unsigned(source[i])) + ";";
+                        writeSize++;
+                    }
+                    // store the actual data in the element after the format string
+                    for (int j = 0; j < vecSize; ++j)
+                    {
+                        std::string arg = args[argumentIndex];
+                        if (vecSize > 1)
+                            arg = "(" + arg + ")." + std::string("xyzw")[j];
+                        switch (source[i])
+                        {
+                            case 'e':
+                            case 'E':
+                            case 'f':
+                            case 'F':
+                            case 'g':
+                            case 'G':
+                            case 'x':
+                            case 'X':
+                                replacement += "printfData[printfIndex++]=floatBitsToUint(" + arg + ");";
+                                break;
+                            default:
+                                replacement += "printfData[printfIndex++]=" + arg + ";";
+                                break;
+                        }
+                        writeSize++;
+                    }
+                    argumentIndex++;
+                }
+            }
 		}
 
 		source = source.substr(0, printfLoc) + "if(printfWriter){" + "uint printfIndex=min(atomicAdd(printfLocation," + std::to_string(writeSize) + "u),printfData.length()-" + std::to_string(writeSize) + "u);" + replacement + "}" + source.substr(printfEndLoc + 1);
